@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Dados gerados em execução (sessões e atendimentos encaminhados: contêm dados de clientes)
+runtime/
+.claudeignore
