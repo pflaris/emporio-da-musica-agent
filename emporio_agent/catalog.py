@@ -209,6 +209,9 @@ def _overview(store: DataStore) -> dict:
     }
 
 
+SORT_OPTIONS = ("preco_asc", "preco_desc")
+
+
 def search_products(
     store: DataStore,
     *,
@@ -220,10 +223,15 @@ def search_products(
     electric: bool | None = None,
     include_unavailable: bool = False,
     limit: int = 6,
+    sort_by: str = "",
 ) -> dict:
     notes: list[str] = []
     limit = max(1, min(int(limit or 6), 10))
     query = (query or "").strip()
+    sort_by = (sort_by or "").strip().lower()
+    if sort_by and sort_by not in SORT_OPTIONS:
+        notes.append(f"Ordenação '{sort_by}' desconhecida; use preco_asc ou preco_desc.")
+        sort_by = ""
 
     category_ids = detect_categories(category) if category else []
     if category and not category_ids:
@@ -288,6 +296,10 @@ def search_products(
         matched = [p for p, _ in scored]
     else:
         matched = sorted(pool, key=lambda p: current_price(store, p)[0])
+
+    if sort_by:
+        # Ordena em código, antes de cortar no limite (desempate pelo id para ser determinístico).
+        matched.sort(key=lambda p: (current_price(store, p)[0], p.id), reverse=sort_by == "preco_desc")
 
     available = [p for p in matched if p.purchasable]
     shown = matched if include_unavailable else available

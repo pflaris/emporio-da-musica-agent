@@ -35,7 +35,9 @@ TOOL_SPECS: list[dict] = [
             "USE SEMPRE que o cliente falar de produtos, preços, disponibilidade, parcelamento de um item "
             "ou pedir recomendação; nunca responda isso de memória. Para um modelo específico, passe o "
             "nome em `consulta` (ex.: 'Takamine GD20'). Para listas, use `categoria` e filtros. Sem nenhum "
-            "filtro, devolve só um resumo do catálogo. Os valores já vêm formatados (campos *_fmt): copie-os, "
+            "filtro, devolve só um resumo do catálogo. Para 'mais caro', 'mais barato', 'melhor' ou qualquer "
+            "superlativo, use `ordenar_por` com `limite` 1 a 3. `total_encontrado` é o total que bateu com o "
+            "filtro, mesmo que só parte seja devolvida. Os valores já vêm formatados (campos *_fmt): copie-os, "
             "não recalcule."
         ),
         "parameters": {
@@ -48,6 +50,11 @@ TOOL_SPECS: list[dict] = [
                 "tipo_cordas": {"type": "string", "enum": ["nylon", "aco"], "description": "Filtra violões/ukuleles por tipo de corda."},
                 "eletroacustico": {"type": "boolean", "description": "true = só com captação/eletrônica; false = só sem."},
                 "incluir_indisponiveis": {"type": "boolean", "description": "true para listar também itens esgotados/descontinuados."},
+                "ordenar_por": {
+                    "type": "string",
+                    "enum": ["preco_asc", "preco_desc"],
+                    "description": "Ordena pelo preço atual ANTES de cortar no limite. preco_desc = mais caro primeiro; preco_asc = mais barato primeiro. Obrigatório para 'mais caro', 'mais barato' e qualquer superlativo.",
+                },
                 "limite": {"type": "integer", "description": "Máximo de itens a retornar (1 a 10). Padrão 6."},
             },
         },
@@ -269,6 +276,7 @@ class Toolbox:
         eletroacustico=None,
         incluir_indisponiveis=False,
         limite=6,
+        ordenar_por: str = "",
     ) -> dict:
         return catalog.search_products(
             self.ctx.store,
@@ -280,6 +288,7 @@ class Toolbox:
             electric=_to_bool(eletroacustico),
             include_unavailable=bool(_to_bool(incluir_indisponiveis)),
             limit=_to_int(limite) if limite else 6,
+            sort_by=ordenar_por or "",
         )
 
     # ---- pedidos -----------------------------------------------------------------------

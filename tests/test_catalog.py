@@ -117,3 +117,34 @@ def test_sem_filtros_devolve_resumo_do_catalogo(make_box):
 def test_argumentos_em_formatos_variados_sao_aceitos(make_box):
     result = make_box().call("buscar_produtos", {"categoria": "ukulele", "preco_max": "R$ 500,00", "limite": 3.0})
     assert result["produtos"] and len(result["produtos"]) <= 3
+
+
+def test_preco_desc_devolve_o_ukulele_mais_caro_mesmo_com_limite_1(make_box):
+    result = make_box().call("buscar_produtos", {"categoria": "ukulele", "ordenar_por": "preco_desc", "limite": 1})
+    assert [c["id"] for c in result["produtos"]] == [129]  # Ohana BK-35E, R$ 1.899 (o 130 é "em breve")
+    assert result["produtos"][0]["preco_atual_fmt"] == "R$ 1.899,00"
+
+
+def test_preco_asc_devolve_o_ukulele_mais_barato(make_box, store):
+    result = make_box().call("buscar_produtos", {"categoria": "ukulele", "ordenar_por": "preco_asc", "limite": 1})
+    from emporio_agent.catalog import current_price
+
+    esperado = min((p for p in store.products.values() if p.category_id == 9 and p.purchasable), key=lambda p: (current_price(store, p)[0], p.id))
+    assert result["produtos"][0]["id"] == esperado.id
+
+
+def test_bateria_mais_cara_com_ordenacao(make_box):
+    result = make_box().call("buscar_produtos", {"categoria": "bateria", "ordenar_por": "preco_desc", "limite": 1})
+    assert result["produtos"][0]["id"] == 141
+
+
+def test_total_encontrado_conta_tudo_mesmo_com_limite(make_box, store):
+    result = make_box().call("buscar_produtos", {"categoria": "ukulele", "limite": 2})
+    vendaveis = [p for p in store.products.values() if p.category_id == 9 and p.purchasable]
+    assert result["total_encontrado"] == len(vendaveis) > 2
+    assert len(result["produtos"]) == result["mostrando"] == 2
+
+
+def test_ordenacao_invalida_e_ignorada_com_aviso(make_box):
+    result = make_box().call("buscar_produtos", {"categoria": "ukulele", "ordenar_por": "azul"})
+    assert result["produtos"] and any("Ordenação" in n for n in result["observacoes"])

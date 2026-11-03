@@ -59,6 +59,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO if args.debug else logging.WARNING, format="[%(levelname)s] %(message)s")
+    # "HTTP Request: POST ..." (httpx/httpcore) só aparece com --debug.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.INFO if args.debug else logging.WARNING)
     settings = Settings.from_env()
 
     if args.check_api:
