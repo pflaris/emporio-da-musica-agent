@@ -162,3 +162,19 @@ def test_encaminhar_atendente_grava_protocolo_e_informa_prazo(make_box, tmp_path
     saved = [json.loads(line) for line in (tmp_path / "handoffs.jsonl").read_text(encoding="utf-8").splitlines()]
     assert saved[0]["resumo"] == "Pedido 7 chegou riscado" and saved[0]["contato"] == "(67) 99789-0123"
     assert "erro" in box.call("encaminhar_atendente", {"tipo": "outro", "resumo": "  "})
+
+
+def test_gemini_fora_do_ar_gera_erro_amigavel_e_o_agente_continua_usavel(build):
+    agent, _ = build([LLMError("Erro ao consultar o Gemini (HTTP 503): indisponível"), text_response("voltei")])
+    with pytest.raises(LLMError) as erro:
+        agent.reply("oi")
+    assert "Traceback" not in str(erro.value) and len(agent.contents) == 0  # nada de meia-conversa
+    assert agent.reply("oi de novo").text == "voltei"
+
+
+def test_prompt_exige_confirmacao_do_cliente_antes_de_encaminhar_devolucao(build):
+    agent, backend = build([text_response("ok")])
+    agent.reply("oi")
+    prompt = backend.system_prompts[0]
+    assert "PERGUNTE se o cliente quer que você encaminhe" in prompt
+    assert "só chame `encaminhar_atendente` depois de um \"sim\"" in prompt

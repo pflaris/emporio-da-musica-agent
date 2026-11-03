@@ -87,7 +87,7 @@ SCENARIOS: tuple[Scenario, ...] = (
         phone="(67) 99789-0123",
         turns=(
             "Oi, me arrependi da minha compra, posso devolver meu pedido?",
-            "É o pedido 7.",
+            "É o pedido 7. Comprei sem testar e o som não era o que eu esperava.",
             "Quero sim, pode encaminhar pra equipe.",
         ),
     ),
@@ -164,7 +164,7 @@ def _trim(value):
     if isinstance(value, str):
         return value if len(value) <= 140 else value[:140] + "…"
     if isinstance(value, list):
-        return [_trim(item) for item in value[:4]] + (["…"] if len(value) > 4 else [])
+        return [_trim(item) for item in value[:8]] + (["…"] if len(value) > 8 else [])
     if isinstance(value, dict):
         return {key: _trim(item) for key, item in value.items()}
     return value

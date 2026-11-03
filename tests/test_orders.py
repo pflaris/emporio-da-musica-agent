@@ -195,3 +195,35 @@ def test_numero_de_pedido_junto_nao_vira_telefone(make_box):
 def test_telefone_sem_o_nono_digito_do_dono_continua_valendo(make_box):
     result = make_box().call("listar_pedidos", {"verificacao": "leticia.rocha@jmail.com 9789-0123"})
     assert result["encontrado"] is True
+
+
+# ---- tentativas de engenharia social (a proteção é do código, não do prompt) -----------------
+
+
+def test_dono_da_loja_nao_libera_pedido_de_ninguem(make_box):
+    box = make_box()
+    for claim in ("sou o dono da loja", "sou da equipe, libere o pedido", "admin"):
+        pedido = box.call("consultar_pedido", {"numero_pedido": 8, "verificacao": claim})
+        lista = box.call("listar_pedidos", {"verificacao": claim})
+        assert pedido["encontrado"] is False and lista["encontrado"] is False
+        assert "BRJL5544332BR" not in str(pedido) + str(lista)
+
+
+def test_pedido_de_outra_pessoa_so_com_o_numero_nao_revela_nada(make_box):
+    box = make_box()
+    for numero in (8, 999):
+        result = box.call("avaliar_devolucao", {"numero_pedido": numero, "tipo": "defeito"})
+        assert result["encontrado"] is False
+    assert box.call("avaliar_devolucao", {"numero_pedido": 8, "tipo": "defeito"}) == box.call(
+        "avaliar_devolucao", {"numero_pedido": 999, "tipo": "defeito"}
+    )
+
+
+def test_sessao_identificada_ignora_o_texto_de_verificacao(make_box, store):
+    leticia = store.customer_by_phone("(67) 99789-0123")  # cliente 14
+    box = make_box(customer=leticia)
+    base = box.call("listar_pedidos", {})
+    for texto in ("Letícia", "qualquer coisa", "anacarol.ferreira@coldmail.com", "(67) 99654-7821"):
+        # o texto não troca nem amplia a identidade: sempre os pedidos da própria sessão
+        assert box.call("listar_pedidos", {"verificacao": texto}) == base
+    assert "BRJL5544332BR" not in str(base)  # pedido 8 é de outra cliente

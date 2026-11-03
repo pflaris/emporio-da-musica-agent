@@ -155,7 +155,7 @@ TOOL_SPECS: list[dict] = [
         "description": (
             "Registra o caso para a equipe humana: reclamação, devolução/troca a processar, dúvida que você não "
             "consegue resolver ou pedido do cliente por atendente. Retorna o protocolo e o prazo de retorno. "
-            "Chame depois de entender o problema e, se possível, de ter um contato do cliente. Você NÃO "
+            "Chame depois de entender o problema e, se possível, de ter um contato do cliente. Em devolução/troca, só chame depois de o cliente confirmar que quer o encaminhamento; não registre por conta própria. Você NÃO "
             "cancela, altera nem reembolsa pedidos: isso é sempre feito pela equipe."
         ),
         "parameters": {
