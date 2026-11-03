@@ -42,19 +42,95 @@ def payment_label(code: str) -> str:
 # --------------------------------------------------------------------------------------
 
 
-def verify_customer(store: DataStore, customer: Customer, verification: str) -> tuple[bool, str]:
+def _split_verification(verification: str) -> tuple[list[str], str]:
+    """Separa e-mails e dígitos de telefone do texto (dígitos dentro do e-mail não contam)."""
     text = (verification or "").strip().lower()
     emails = _EMAIL_RE.findall(text)
-    for email in emails:
-        if email == customer.email:
-            # E-mail repetido em mais de um cadastro não identifica ninguém sozinho.
-            if len(store.customers_with_email(email)) > 1:
-                return False, "email_compartilhado"
-            return True, "email"
-    digits = re.sub(r"\D", "", text)
-    if len(digits) >= 9 and digits[-9:] == customer.phone_digits[-9:]:
+    digits = re.sub(r"\D", "", _EMAIL_RE.sub(" ", text))
+    return emails, (digits if len(digits) >= 8 else "")
+
+
+def verify_customer(store: DataStore, customer: Customer, verification: str) -> tuple[bool, str]:
+    """E-mail e telefone informados juntos precisam ser do MESMO cadastro; um só, basta que confira."""
+    emails, digits = _split_verification(verification)
+    email_ok = customer.email in emails
+    phone_ok = bool(digits) and customer.phone_digits.endswith(digits[-9:])
+
+    if emails and digits:
+        return (True, "email_e_telefone") if email_ok and phone_ok else (False, "nao_confere")
+    if emails:
+        if not email_ok:
+            return False, "nao_confere"
+        # E-mail repetido em mais de um cadastro não identifica ninguém sozinho.
+        if len(store.customers_with_email(customer.email)) > 1:
+            return False, "email_compartilhado"
+        return True, "email"
+    if phone_ok:
         return True, "telefone"
     return False, "nao_confere"
+
+
+def resolve_customer(
+    store: DataStore, session_customer: Customer | None, verification: str
+) -> tuple[Customer | None, str | None]:
+    """Identifica o cliente para listar pedidos: pela sessão ou por e-mail/telefone cadastrado.
+
+    Com e-mail e telefone juntos, o telefone precisa ser de um dono desse e-mail; senão, nega
+    com a mesma resposta genérica (sem revelar nome nem a quem pertence cada dado).
+    """
+    if session_customer is not None:
+        return session_customer, None
+    emails, digits = _split_verification(verification)
+    if not emails and not digits:
+        return None, "precisa_verificacao"
+
+    by_email = {c.id: c for e in emails for c in store.customers_with_email(e)}
+    by_phone = store.customer_by_phone(digits) if digits else None
+
+    if emails and digits:
+        if by_phone is not None and by_phone.id in by_email:
+            return by_phone, None
+        return None, "nao_confere"
+    if emails:
+        if len(by_email) == 1:
+            return next(iter(by_email.values())), None
+        return (None, "email_compartilhado") if by_email else (None, "nao_confere")
+    return (by_phone, None) if by_phone is not None else (None, "nao_confere")
+
+
+def list_orders(store: DataStore, customer: Customer) -> dict:
+    """Resumo dos pedidos do cliente, do mais recente para o mais antigo."""
+    mine = sorted(
+        (o for o in store.orders.values() if o.customer_id == customer.id),
+        key=lambda o: (o.order_date or date.min, o.id),
+        reverse=True,
+    )
+    summaries = []
+    for order in mine:
+        names = []
+        for item in order.items:
+            product = store.products.get(item.product_id)
+            names.append(f"{item.quantity}x {product.name if product else 'produto não identificado'}")
+        summaries.append(
+            {
+                "numero_pedido": order.id,
+                "data_do_pedido": fmt_date(order.order_date),
+                "status": STATUS_PT.get(order.status, order.status),
+                "valor_total_fmt": brl(order.total),
+                "itens": names,
+            }
+        )
+    return {
+        "encontrado": bool(summaries),
+        "cliente_primeiro_nome": customer.first_name,
+        "total_de_pedidos": len(summaries),
+        "pedidos": summaries,
+        "orientacao": (
+            "Liste os pedidos de forma curta. Para detalhes de um deles (rastreio, previsão), use consultar_pedido."
+            if summaries
+            else "Este cliente não tem pedidos registrados. Diga isso com naturalidade e ofereça ajuda."
+        ),
+    }
 
 
 def authorize_order(

@@ -112,3 +112,86 @@ def test_pedido_ainda_nao_entregue_ou_cancelado(make_box):
 def test_devolucao_exige_verificacao(make_box):
     result = make_box().call("avaliar_devolucao", {"numero_pedido": 7, "tipo": "arrependimento"})
     assert result["encontrado"] is False
+
+
+def test_listar_pedidos_sem_verificacao_pede_confirmacao(make_box):
+    result = make_box().call("listar_pedidos", {})
+    assert result["encontrado"] is False
+
+
+def test_listar_pedidos_por_telefone_sem_formatacao(make_box):
+    result = make_box().call("listar_pedidos", {"verificacao": "67997890123"})
+    assert result["encontrado"] is True
+    assert [p["numero_pedido"] for p in result["pedidos"]] == [7]
+
+
+def test_listar_pedidos_telefone_errado_nao_revela_nada(make_box):
+    result = make_box().call("listar_pedidos", {"verificacao": "67900000000"})
+    assert result["encontrado"] is False
+    assert "pedidos" not in result
+
+
+def test_listar_pedidos_de_sessao_identificada(make_box, store):
+    cliente = store.customer_by_phone("67997890123")
+    result = make_box(customer=cliente).call("listar_pedidos", {})
+    assert [p["numero_pedido"] for p in result["pedidos"]] == [7]
+
+
+def test_listar_pedidos_email_de_um_e_telefone_de_outro_nega(make_box):
+    # e-mail da Letícia (id 14) + telefone da Amanda Rocha (id 46)
+    result = make_box().call("listar_pedidos", {"verificacao": "leticia.rocha@jmail.com (67) 99789-6789"})
+    assert result["encontrado"] is False
+    assert "pedidos" not in result and "cliente_primeiro_nome" not in result
+
+
+def test_listar_pedidos_email_e_telefone_do_mesmo_cadastro(make_box):
+    result = make_box().call("listar_pedidos", {"verificacao": "leticia.rocha@jmail.com 67997890123"})
+    assert result["encontrado"] is True
+    assert result["cliente_primeiro_nome"] == "Letícia"
+
+
+def test_email_compartilhado_com_telefone_de_outro_cliente_nega(make_box):
+    # bruno.martins@jmail.com é dos clientes 11 e 43; o telefone é da Letícia
+    result = make_box().call("listar_pedidos", {"verificacao": "bruno.martins@jmail.com 67997890123"})
+    assert result["encontrado"] is False
+    assert "cliente_primeiro_nome" not in result
+
+
+def test_email_compartilhado_com_telefone_de_um_dos_donos_identifica(make_box):
+    result = make_box().call("listar_pedidos", {"verificacao": "bruno.martins@jmail.com (67) 99456-3456"})
+    assert result.get("cliente_primeiro_nome") == "Bruno"
+    assert result["total_de_pedidos"] == len(result["pedidos"])
+
+
+def test_consultar_pedido_email_de_um_e_telefone_de_outro_nega(make_box):
+    # pedido 7 é da Letícia: e-mail dela + telefone da Amanda não pode abrir
+    result = make_box().call(
+        "consultar_pedido", {"numero_pedido": 7, "verificacao": "leticia.rocha@jmail.com (67) 99789-6789"}
+    )
+    assert result["encontrado"] is False
+
+
+def test_consultar_pedido_email_e_telefone_corretos_liberam(make_box):
+    result = make_box().call(
+        "consultar_pedido", {"numero_pedido": 7, "verificacao": "leticia.rocha@jmail.com 67997890123"}
+    )
+    assert result["encontrado"] is True
+
+
+def test_email_certo_com_telefone_curto_errado_nega(make_box):
+    # 8 dígitos que não são da Letícia contam como tentativa de telefone, não são ignorados
+    for tool, args in (
+        ("listar_pedidos", {"verificacao": "leticia.rocha@jmail.com 99999999"}),
+        ("consultar_pedido", {"numero_pedido": 7, "verificacao": "leticia.rocha@jmail.com 99999999"}),
+    ):
+        assert make_box().call(tool, args)["encontrado"] is False
+
+
+def test_numero_de_pedido_junto_nao_vira_telefone(make_box):
+    result = make_box().call("consultar_pedido", {"numero_pedido": 7, "verificacao": "leticia.rocha@jmail.com pedido 7"})
+    assert result["encontrado"] is True
+
+
+def test_telefone_sem_o_nono_digito_do_dono_continua_valendo(make_box):
+    result = make_box().call("listar_pedidos", {"verificacao": "leticia.rocha@jmail.com 9789-0123"})
+    assert result["encontrado"] is True

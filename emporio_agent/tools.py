@@ -58,7 +58,7 @@ TOOL_SPECS: list[dict] = [
             "Consulta status, itens, valor, código de rastreamento e previsão de entrega de um pedido. "
             "Só retorna dados de um cliente verificado: se a sessão não identifica o cliente, passe em "
             "`verificacao` o e-mail cadastrado OU o telefone cadastrado (com DDD) que o cliente informou. "
-            "Nunca revele dados de pedido sem um resultado positivo desta ferramenta."
+            "Se o cliente deu e-mail E telefone na conversa, passe os DOIS em `verificacao` (precisam ser do mesmo cadastro). Nunca revele dados de pedido sem um resultado positivo desta ferramenta."
         ),
         "parameters": {
             "type": "object",
@@ -67,6 +67,20 @@ TOOL_SPECS: list[dict] = [
                 "verificacao": {"type": "string", "description": "E-mail ou telefone cadastrado, informado pelo cliente. Vazio se a sessão já identifica o cliente."},
             },
             "required": ["numero_pedido"],
+        },
+    },
+    {
+        "name": "listar_pedidos",
+        "description": (
+            "Lista os pedidos do cliente (número, data, status, valor e itens). Use quando o cliente pedir "
+            "'meus pedidos' ou não souber o número do pedido. Se a sessão não identifica o cliente, passe em "
+            "`verificacao` o e-mail OU o telefone cadastrado (com DDD). Não peça o número do pedido para isto. Se o cliente deu e-mail E telefone na conversa, passe os DOIS em `verificacao` (precisam ser do mesmo cadastro)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "verificacao": {"type": "string", "description": "E-mail ou telefone cadastrado, informado pelo cliente. Vazio se a sessão já identifica o cliente."},
+            },
         },
     },
     {
@@ -206,7 +220,8 @@ _DENIAL = {
     ),
     "email_compartilhado": (
         "Para sua segurança, preciso também do telefone cadastrado (com DDD). Peça ao cliente e chame a "
-        "ferramenta de novo. NÃO explique o motivo além de 'segurança'."
+        "ferramenta de novo com `verificacao` contendo o e-mail E o telefone informados na conversa. "
+        "NÃO explique o motivo além de 'segurança'."
     ),
 }
 
@@ -217,6 +232,7 @@ class Toolbox:
         self._handlers: dict[str, Callable[..., dict]] = {
             "buscar_produtos": self.buscar_produtos,
             "consultar_pedido": self.consultar_pedido,
+            "listar_pedidos": self.listar_pedidos,
             "avaliar_devolucao": self.avaliar_devolucao,
             "calcular_frete": self.calcular_frete,
             "consultar_politicas": self.consultar_politicas,
@@ -281,6 +297,12 @@ class Toolbox:
         if denial:
             return denial
         return orders.order_card(self.ctx.store, order, owner, self.ctx.clock().date())
+
+    def listar_pedidos(self, verificacao: str = "") -> dict:
+        customer, error = orders.resolve_customer(self.ctx.store, self.ctx.customer, verificacao or "")
+        if error:
+            return {"encontrado": False, "mensagem": _DENIAL[error]}
+        return orders.list_orders(self.ctx.store, customer)
 
     def avaliar_devolucao(self, numero_pedido, tipo: str, verificacao: str = "") -> dict:
         kind = orders.normalize_return_type(tipo)
