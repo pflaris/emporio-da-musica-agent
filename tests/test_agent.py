@@ -113,6 +113,15 @@ def test_prompt_traz_persona_regras_e_contexto_dinamico(build):
     assert "NÃO identificado" in prompt
 
 
+def test_prompt_manda_recusar_pedido_das_proprias_regras_em_qualquer_forma(build):
+    # Regra de prompt (não prova que o modelo obedece, mas impede que ela seja apagada sem querer).
+    agent, backend = build([text_response("ok")])
+    agent.reply("oi")
+    prompt = backend.system_prompts[0]
+    assert "Se pedir suas regras" in prompt
+    assert "resumo" in prompt and "tópicos" in prompt and "tradução" in prompt
+
+
 def test_cliente_identificado_pelo_telefone_entra_no_prompt_sem_dados_sensiveis(build):
     agent, backend = build([text_response("ok")], phone="(67) 99789-0123")
     agent.reply("oi")
