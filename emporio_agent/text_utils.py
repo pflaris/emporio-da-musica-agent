@@ -75,3 +75,27 @@ def brl(value) -> str:
 def apply_discount(price, percent) -> Decimal:
     """Preço após desconto percentual, já arredondado."""
     return money(Decimal(str(price)) * (Decimal(100) - Decimal(str(percent))) / Decimal(100))
+
+
+# --------------------------------------------------------------------------------------
+# Acabamento da resposta final (regras de estilo que não dependem só do modelo)
+# --------------------------------------------------------------------------------------
+
+_EMOJI_RE = re.compile("[\U0001f300-\U0001faff☀-➿][️‍]*")
+
+
+def polish_reply(text: str) -> str:
+    """Corrige o nome da loja sem acento e deixa no máximo um emoji por mensagem."""
+    text = re.sub(r"\bEmporio da Musica\b", "Empório da Música", text)
+    text = re.sub(r"\bEmporio\b", "Empório", text)
+
+    seen = 0
+
+    def keep_first(match: re.Match) -> str:
+        nonlocal seen
+        seen += 1
+        return match.group() if seen == 1 else ""
+
+    text = _EMOJI_RE.sub(keep_first, text)
+    text = re.sub(r"[ \t]+([.,!?\n])", r"\1", text)  # espaço que sobrou onde um emoji saiu
+    return re.sub(r"[ \t]{2,}", " ", text).strip()

@@ -15,6 +15,7 @@ from .config import Settings
 from .data_store import Customer
 from .llm import LLMError
 from .prompts import build_system_prompt
+from .text_utils import polish_reply
 from .tools import Toolbox
 
 log = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ class Agent:
             del self.contents[checkpoint:]
             return AgentReply(FALLBACK_TEXT, traces)
 
+        final_text = polish_reply(final_text)
         self.transcript.append({"role": "user", "text": user_text})
         self.transcript.append({"role": "model", "text": final_text})
         return AgentReply(final_text, traces)

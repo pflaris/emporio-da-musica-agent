@@ -148,3 +148,11 @@ def test_total_encontrado_conta_tudo_mesmo_com_limite(make_box, store):
 def test_ordenacao_invalida_e_ignorada_com_aviso(make_box):
     result = make_box().call("buscar_produtos", {"categoria": "ukulele", "ordenar_por": "azul"})
     assert result["produtos"] and any("Ordenação" in n for n in result["observacoes"])
+
+
+def test_polish_reply_acentua_a_loja_e_limita_a_um_emoji():
+    from emporio_agent.text_utils import polish_reply
+
+    assert polish_reply("Valeu por escolher a Emporio da Musica! 🎸🎶") == "Valeu por escolher a Empório da Música! 🎸"
+    assert polish_reply("Bem-vindo ao Emporio 🎸 e boa música 🎶!") == "Bem-vindo ao Empório 🎸 e boa música!"
+    assert polish_reply("Custa R$ 1.899,00 🎸") == "Custa R$ 1.899,00 🎸"
